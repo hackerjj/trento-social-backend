@@ -1,0 +1,107 @@
+# =============================================================================
+# Trento Social Backend — Multi-stage Secure Build for Render
+# =============================================================================
+# Stage 1: Builder — install Composer dependencies (no dev)
+# Stage 2: Production — minimal Alpine image with runtime extensions only
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Stage 1: Builder
+# ---------------------------------------------------------------------------
+FROM composer:2 AS builder
+
+WORKDIR /app
+
+# Copy only dependency manifests first for layer caching
+COPY composer.json composer.lock* ./
+
+# Install production dependencies only — no dev packages
+RUN composer install \
+    --no-dev \
+    --optimize-autoloader \
+    --no-interaction \
+    --no-scripts \
+    --ignore-platform-reqs \
+    --prefer-dist
+
+# Copy application source (after deps for better caching)
+COPY . .
+
+# Ensure bootstrap/cache exists (required by Laravel's package discovery)
+RUN mkdir -p bootstrap/cache && chmod 777 bootstrap/cache
+
+# Re-run autoload dump with scripts now that source is present
+RUN composer dump-autoload --optimize --no-dev
+
+# ---------------------------------------------------------------------------
+# Stage 2: Production
+# ---------------------------------------------------------------------------
+FROM php:8.3-cli-alpine
+
+# Install build dependencies temporarily, compile extensions, then remove
+RUN apk add --no-cache --virtual .build-deps \
+        $PHPIZE_DEPS \
+        openssl-dev \
+        linux-headers \
+    && pecl install mongodb redis \
+    && docker-php-ext-enable mongodb redis \
+    && docker-php-ext-install opcache \
+    && apk del .build-deps \
+    && rm -rf /tmp/pear /var/cache/apk/* \
+    && php -m | grep -i mongodb \
+    && php -m | grep -i redis
+
+# Configure OPcache for production (no file timestamp checks)
+RUN { \
+    echo 'opcache.enable=1'; \
+    echo 'opcache.enable_cli=1'; \
+    echo 'opcache.validate_timestamps=0'; \
+    echo 'opcache.max_accelerated_files=20000'; \
+    echo 'opcache.memory_consumption=256'; \
+    echo 'opcache.interned_strings_buffer=16'; \
+    echo 'opcache.jit=1255'; \
+    echo 'opcache.jit_buffer_size=128M'; \
+} > /usr/local/etc/php/conf.d/opcache-production.ini
+
+# Create non-root user (UID 1000)
+RUN adduser -D -u 1000 -h /var/www/backend appuser
+
+WORKDIR /var/www/backend
+
+# Copy application from builder (vendor included, no dev packages)
+COPY --from=builder --chown=appuser:appuser /app/vendor ./vendor
+COPY --chown=appuser:appuser . .
+
+# Ensure .env is never present in the image (belt + suspenders with .dockerignore)
+RUN rm -f .env .env.* 2>/dev/null || true
+
+# Create required storage directories
+RUN mkdir -p \
+    storage/framework/cache/data \
+    storage/framework/sessions \
+    storage/framework/views \
+    storage/logs \
+    bootstrap/cache
+
+# Set ownership: appuser owns writable directories
+RUN chown -R appuser:appuser storage bootstrap/cache
+
+# Set filesystem read-only except writable dirs
+RUN chmod -R 555 . \
+    && chmod -R 775 storage/logs storage/framework/cache \
+    && chmod -R 775 storage/framework/sessions storage/framework/views \
+    && chmod -R 775 bootstrap/cache
+
+# Create a writable .env placeholder for start.sh to write runtime env vars
+RUN touch .env && chown appuser:appuser .env && chmod 664 .env
+
+# Copy and set entrypoint
+COPY --chown=appuser:appuser start.sh /var/www/backend/start.sh
+RUN chmod +x /var/www/backend/start.sh
+
+# Switch to non-root user as final directive
+USER appuser
+
+EXPOSE 10000
+
+CMD ["/var/www/backend/start.sh"]
