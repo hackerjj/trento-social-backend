@@ -40,6 +40,18 @@ class RegistroController extends Controller
             $telefono = substr($telefono, 2);
         }
 
+        // Evita duplicar el mismo numero de WhatsApp (FR-3.2bis). Se compara el
+        // telefono ya normalizado a 10 digitos, sin importar como lo escribio el
+        // usuario (con o sin +52).
+        $yaExiste = TrentoRegistration::where('telefono', $telefono)->exists();
+        if ($yaExiste) {
+            return response()->json([
+                'success' => false,
+                'duplicado' => true,
+                'message' => 'Este número ya se encuentra registrado.',
+            ], 409);
+        }
+
         // Datos autoritativos del servidor (nunca se confia en el cliente para esto).
         $tracking = [
             'tiempo_en_pagina_ms' => $validated['tiempo_en_pagina_ms'] ?? null,
