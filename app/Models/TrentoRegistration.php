@@ -15,6 +15,7 @@ class TrentoRegistration extends Model
         'telefono',
         'telefono_raw',
         'tipo_residente',
+        'personas_vivienda',
         'email',
         'consentimiento',
         'consent_ts',
