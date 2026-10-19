@@ -116,12 +116,40 @@ class LinkController extends Controller
             Log::warning('No se pudieron incrementar contadores del redirect: ' . $e->getMessage());
         }
 
-        // Trabajo caro diferido: corre tras enviar el 302 (mismo proceso con artisan serve).
+        // Trabajo caro diferido: corre tras enviar la respuesta (mismo proceso con artisan serve).
         app()->terminating(function () use ($code, $ip, $userAgent, $referrer, $ts) {
             $this->recordClick($code, $ip, $userAgent, $referrer, $ts);
         });
 
-        return redirect($link->destination, 302);
+        // En vez de un 302 (que cambiaria la URL a la de destino), servimos una pagina
+        // que carga el destino dentro de un iframe a pantalla completa. Asi la barra de
+        // direcciones se queda en el enlace corto /t/<code> y nunca se revela la URL larga.
+        // El destino siempre es el propio sitio de Trento Social, por lo que no hay
+        // bloqueo de iframe (X-Frame-Options) que lo impida.
+        $destino = htmlspecialchars($link->destination, ENT_QUOTES, 'UTF-8');
+        $html = <<<HTML
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Trento Social</title>
+<link rel="icon" type="image/png" sizes="32x32" href="https://hackerjj.github.io/trento-social/favicon-32.png">
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#fff;overflow:hidden}
+  iframe{border:0;width:100%;height:100%;display:block}
+</style>
+</head>
+<body>
+<iframe src="{$destino}" title="Trento Social" allow="clipboard-write"></iframe>
+</body>
+</html>
+HTML;
+
+        return response($html, 200)
+            ->header('Content-Type', 'text/html; charset=UTF-8')
+            ->header('X-Frame-Options', 'SAMEORIGIN');
     }
 
     /**
