@@ -151,6 +151,8 @@ class LinkController extends Controller
         $byCountry = [];
         $byDevice = [];
         $byBrowser = [];
+        $byOs = [];
+        $byIsp = [];
         $byReferrer = [];
         $byDay = [];
 
@@ -164,6 +166,12 @@ class LinkController extends Controller
 
             $browser = $click->browser ?? 'desconocido';
             $byBrowser[$browser] = ($byBrowser[$browser] ?? 0) + 1;
+
+            $os = $click->os ?? 'desconocido';
+            $byOs[$os] = ($byOs[$os] ?? 0) + 1;
+
+            $isp = $geo['isp'] ?? 'desconocido';
+            $byIsp[$isp] = ($byIsp[$isp] ?? 0) + 1;
 
             $ref = $click->referrer ?: 'directo';
             $byReferrer[$ref] = ($byReferrer[$ref] ?? 0) + 1;
@@ -184,8 +192,60 @@ class LinkController extends Controller
             'by_country'  => $byCountry,
             'by_device'   => $byDevice,
             'by_browser'  => $byBrowser,
+            'by_os'       => $byOs,
+            'by_isp'      => $byIsp,
             'by_referrer' => $byReferrer,
             'by_day'      => $byDay,
+        ]);
+    }
+
+    /**
+     * Lista de clics individuales de un enlace (admin, FR-4.3). Cada fila trae
+     * la geo aplanada para que el panel no tenga que desempacar el array.
+     */
+    public function clicks(string $code, Request $request): JsonResponse
+    {
+        $link = TrentoLink::where('code', $code)->first();
+
+        if (!$link) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Enlace no encontrado',
+            ], 404);
+        }
+
+        $clicks = TrentoClick::where('code', $code)
+            ->orderBy('ts', 'desc')
+            ->limit(500)
+            ->get();
+
+        $data = $clicks->map(function (TrentoClick $click) {
+            $geo = is_array($click->geo) ? $click->geo : [];
+
+            return [
+                'ts'         => $click->ts ? (string) $click->ts : null,
+                'ip'         => $click->ip,
+                'country'    => $geo['country'] ?? null,
+                'region'     => $geo['region'] ?? null,
+                'city'       => $geo['city'] ?? null,
+                'lat'        => $geo['lat'] ?? null,
+                'lon'        => $geo['lon'] ?? null,
+                'isp'        => $geo['isp'] ?? null,
+                'org'        => $geo['org'] ?? null,
+                'asn'        => $geo['asn'] ?? null,
+                'device'     => $click->device,
+                'browser'    => $click->browser,
+                'os'         => $click->os,
+                'referrer'   => $click->referrer,
+                'user_agent' => $click->user_agent,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'code'    => $code,
+            'total'   => $data->count(),
+            'data'    => $data,
         ]);
     }
 

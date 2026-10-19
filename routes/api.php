@@ -19,4 +19,5 @@ Route::prefix('trento')
         Route::post('/links', [LinkController::class, 'store']);
         Route::get('/links', [LinkController::class, 'index']);
         Route::get('/links/{code}/stats', [LinkController::class, 'stats']);
+        Route::get('/links/{code}/clicks', [LinkController::class, 'clicks']);
     });

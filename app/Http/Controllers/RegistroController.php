@@ -31,6 +31,11 @@ class RegistroController extends Controller
             'referrer'            => 'nullable|string|max:500',
             'screen'              => 'nullable|string|max:20',
             'idioma'              => 'nullable|string|max:20',
+            'scroll_depth'        => 'nullable|integer|min:0|max:100',
+            'enlace_code'         => 'nullable|string|max:40',
+            'zona_horaria'        => 'nullable|string|max:60',
+            'ventana'             => 'nullable|string|max:20',
+            'plataforma'          => 'nullable|string|max:60',
         ]);
 
         // Normaliza el telefono a 10 digitos nacionales (quita +52 / 52 inicial).
@@ -59,6 +64,11 @@ class RegistroController extends Controller
             'user_agent'          => $request->userAgent(),
             'screen'              => $validated['screen'] ?? null,
             'idioma'              => $validated['idioma'] ?? null,
+            'scroll_depth'        => $validated['scroll_depth'] ?? null,
+            'enlace_code'         => $validated['enlace_code'] ?? null,
+            'zona_horaria'        => $validated['zona_horaria'] ?? null,
+            'ventana'             => $validated['ventana'] ?? null,
+            'plataforma'          => $validated['plataforma'] ?? null,
             'ip'                  => $request->ip(),
         ];
 
@@ -142,6 +152,11 @@ class RegistroController extends Controller
             'referrer',
             'user_agent',
             'created_at',
+            'scroll_depth',
+            'enlace_code',
+            'zona_horaria',
+            'ventana',
+            'plataforma',
         ];
 
         $filename = 'trento_registros_' . date('Y-m-d_His') . '.csv';
@@ -177,6 +192,11 @@ class RegistroController extends Controller
                             $tracking['referrer'] ?? null,
                             $tracking['user_agent'] ?? null,
                             $createdAt,
+                            $tracking['scroll_depth'] ?? null,
+                            $tracking['enlace_code'] ?? null,
+                            $tracking['zona_horaria'] ?? null,
+                            $tracking['ventana'] ?? null,
+                            $tracking['plataforma'] ?? null,
                         ]);
                     }
                 });
