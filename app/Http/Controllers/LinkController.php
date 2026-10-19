@@ -121,35 +121,12 @@ class LinkController extends Controller
             $this->recordClick($code, $ip, $userAgent, $referrer, $ts);
         });
 
-        // En vez de un 302 (que cambiaria la URL a la de destino), servimos una pagina
-        // que carga el destino dentro de un iframe a pantalla completa. Asi la barra de
-        // direcciones se queda en el enlace corto /t/<code> y nunca se revela la URL larga.
-        // El destino siempre es el propio sitio de Trento Social, por lo que no hay
-        // bloqueo de iframe (X-Frame-Options) que lo impida.
-        $destino = htmlspecialchars($link->destination, ENT_QUOTES, 'UTF-8');
-        $html = <<<HTML
-<!doctype html>
-<html lang="es">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="referrer" content="no-referrer">
-<title>Trento Social</title>
-<link rel="icon" type="image/png" sizes="32x32" href="https://hackerjj.github.io/trento-social/favicon-32.png">
-<style>
-  html,body{margin:0;padding:0;height:100%;background:#fff;overflow:hidden}
-  iframe{border:0;width:100%;height:100%;display:block}
-</style>
-</head>
-<body>
-<iframe src="{$destino}" title="Trento Social" allow="clipboard-write"></iframe>
-</body>
-</html>
-HTML;
+        // 302 real hacia el destino, agregando ?t=<code> (o &t=<code> si el destino
+        // ya tiene query string) para poder correlacionar la visita con el enlace corto.
+        $separator = parse_url($link->destination, PHP_URL_QUERY) !== null ? '&' : '?';
+        $destinoConParamT = $link->destination . $separator . 't=' . urlencode($code);
 
-        return response($html, 200)
-            ->header('Content-Type', 'text/html; charset=UTF-8')
-            ->header('X-Frame-Options', 'SAMEORIGIN');
+        return redirect($destinoConParamT, 302);
     }
 
     /**
@@ -271,13 +248,22 @@ HTML;
 
     /**
      * Geolocalizacion por IP, best-effort, con cache de 24h y timeout corto.
-     * Devuelve ['country'=>?,'city'=>?]; ambos null si falla o esta desactivada.
+     * Todos los campos son null si falla, esta desactivada, o la IP es privada/reservada.
      *
-     * @return array{country: ?string, city: ?string}
+     * @return array{country: ?string, city: ?string, region: ?string, lat: ?float, lon: ?float, isp: ?string, org: ?string, asn: ?string}
      */
     private function resolveGeo(?string $ip): array
     {
-        $empty = ['country' => null, 'city' => null];
+        $empty = [
+            'country' => null,
+            'city'    => null,
+            'region'  => null,
+            'lat'     => null,
+            'lon'     => null,
+            'isp'     => null,
+            'org'     => null,
+            'asn'     => null,
+        ];
 
         $provider = env('GEO_PROVIDER', 'ipwhois');
 
@@ -300,6 +286,12 @@ HTML;
                     return [
                         'country' => $decoded['country'] ?? null,
                         'city'    => $decoded['city'] ?? null,
+                        'region'  => $decoded['region'] ?? null,
+                        'lat'     => $decoded['lat'] ?? null,
+                        'lon'     => $decoded['lon'] ?? null,
+                        'isp'     => $decoded['isp'] ?? null,
+                        'org'     => $decoded['org'] ?? null,
+                        'asn'     => $decoded['asn'] ?? null,
                     ];
                 }
             }
@@ -315,11 +307,19 @@ HTML;
         try {
             if ($provider === 'ip-api') {
                 $resp = Http::timeout($timeout)
-                    ->get('http://ip-api.com/json/' . $ip, ['fields' => 'status,country,countryCode,city']);
+                    ->get('http://ip-api.com/json/' . $ip, [
+                        'fields' => 'status,country,countryCode,city,regionName,lat,lon,isp,org,as',
+                    ]);
                 if ($resp->ok() && ($resp->json('status') === 'success')) {
                     $geo = [
                         'country' => $resp->json('countryCode'),
                         'city'    => $resp->json('city'),
+                        'region'  => $resp->json('regionName'),
+                        'lat'     => $resp->json('lat'),
+                        'lon'     => $resp->json('lon'),
+                        'isp'     => $resp->json('isp'),
+                        'org'     => $resp->json('org'),
+                        'asn'     => $resp->json('as'),
                     ];
                 }
             } else {
@@ -329,6 +329,12 @@ HTML;
                     $geo = [
                         'country' => $resp->json('country_code'),
                         'city'    => $resp->json('city'),
+                        'region'  => $resp->json('region'),
+                        'lat'     => $resp->json('latitude'),
+                        'lon'     => $resp->json('longitude'),
+                        'isp'     => $resp->json('connection.isp'),
+                        'org'     => $resp->json('connection.org'),
+                        'asn'     => $resp->json('connection.asn'),
                     ];
                 }
             }
