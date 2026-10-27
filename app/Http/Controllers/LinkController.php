@@ -87,20 +87,6 @@ class LinkController extends Controller
      */
     public function redirect(string $code, Request $request): Response|RedirectResponse
     {
-        // DEBUG TEMPORAL: diagnostico de headers de IP (quitar en el siguiente paso)
-        $ipDebug = [
-            'remote_addr'       => $request->server('REMOTE_ADDR'),
-            'x_forwarded_for'   => $request->header('X-Forwarded-For'),
-            'cf_connecting_ip'  => $request->header('CF-Connecting-IP'),
-            'true_client_ip'    => $request->header('True-Client-IP'),
-            'x_real_ip'         => $request->header('X-Real-IP'),
-            'x_forwarded_proto' => $request->header('X-Forwarded-Proto'),
-            'request_ip'        => $request->ip(),
-        ];
-        Log::info('TRENTO_IP_DEBUG', $ipDebug);
-        // Tambien a stderr para que aparezca en los logs de Render sin depender de LOG_CHANNEL
-        @file_put_contents('php://stderr', 'TRENTO_IP_DEBUG ' . json_encode($ipDebug) . PHP_EOL);
-
         $link = TrentoLink::where('code', $code)->where('active', true)->first();
 
         if (!$link) {

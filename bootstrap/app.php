@@ -32,15 +32,21 @@ return Application::configure(basePath: dirname(__DIR__))
         }
     })
     ->withMiddleware(function (Middleware $middleware) {
-        // Render (y cualquier PaaS) pone la app detras de un proxy. Sin esto, $request->ip()
-        // devuelve la IP del proxy en vez de la del cliente real. Confiamos en los headers
-        // X-Forwarded-* para capturar la IP verdadera (tracking y geo del acortador).
-        $middleware->trustProxies(at: '*', headers:
+        // Render pone Cloudflare + su balanceador interno delante de la app. Confiamos
+        // SOLO en esos saltos (loopback, redes privadas y rangos de Cloudflare), no en '*':
+        // con '*' $request->ip() devolvia el 10.x interno de Render. Asi Symfony recorre
+        // X-Forwarded-For de derecha a izquierda y toma la primera IP no confiable, y un
+        // X-Forwarded-For inventado por el cliente (a la izquierda) queda ignorado.
+        // Detalle completo en App\Http\Middleware\ResolveClientIp.
+        $middleware->trustProxies(at: \App\Http\Middleware\ResolveClientIp::TRUSTED_PROXIES, headers:
             \Illuminate\Http\Request::HEADER_X_FORWARDED_FOR |
             \Illuminate\Http\Request::HEADER_X_FORWARDED_HOST |
             \Illuminate\Http\Request::HEADER_X_FORWARDED_PORT |
             \Illuminate\Http\Request::HEADER_X_FORWARDED_PROTO
         );
+        // Global (corre antes del throttle de rutas): prefiere CF-Connecting-IP cuando
+        // el request viene de un salto confiable. Aplica a /t/{code}, /api/* y rate limits.
+        $middleware->append(\App\Http\Middleware\ResolveClientIp::class);
         $middleware->api(prepend: [
             \App\Http\Middleware\CorrelationId::class,
             \App\Http\Middleware\SecurityHeaders::class,
