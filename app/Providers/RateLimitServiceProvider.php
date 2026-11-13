@@ -24,6 +24,11 @@ class RateLimitServiceProvider extends ServiceProvider
         });
 
         // Endpoints admin: 60 solicitudes por minuto por IP.
+        // Curso AIF-C01: el navegador del alumno manda avances y resultados.
+        RateLimiter::for('aif-public', function (Request $request) {
+            return Limit::perMinute(30)->by($request->ip());
+        });
+
         RateLimiter::for('trento-admin', function (Request $request) {
             return Limit::perMinute(60)
                 ->by($request->ip())

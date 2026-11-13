@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AifResultadoController;
 use App\Http\Controllers\LinkController;
 use App\Http\Controllers\RegistroController;
 use Illuminate\Support\Facades\Route;
@@ -21,3 +22,9 @@ Route::prefix('trento')
         Route::get('/links/{code}/stats', [LinkController::class, 'stats']);
         Route::get('/links/{code}/clicks', [LinkController::class, 'clicks']);
     });
+
+// ---- Curso AIF-C01 (sitios de estudio de Jair y Gaby) ----
+Route::post('/aif/resultado', [AifResultadoController::class, 'store'])
+    ->middleware('throttle:aif-public');
+Route::get('/aif/resultados', [AifResultadoController::class, 'index'])
+    ->middleware(['trento.admin', 'throttle:trento-admin']);
