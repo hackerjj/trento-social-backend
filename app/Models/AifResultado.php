@@ -33,7 +33,7 @@ class AifResultado extends Model
 
     public const USUARIOS = ['gaby', 'jair'];
 
-    public const MODULOS = ['diagnostico', 'guia1', 'guia2', 'practica', 'simulacro1', 'simulacro2', 'practica2', 'simulacro3', 'practica3', 'practica4', 'simulacro4', 'snapshot'];
+    public const MODULOS = ['diagnostico', 'guia1', 'guia2', 'practica', 'simulacro1', 'simulacro2', 'practica2', 'simulacro3', 'practica3', 'practica4', 'simulacro4', 'practica5', 'simulacro5', 'snapshot'];
 
     public const EVENTOS = ['avance', 'terminado', 'snapshot'];
 }
