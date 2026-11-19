@@ -31,7 +31,7 @@ class AifResultado extends Model
         'estado' => 'array',
     ];
 
-    public const USUARIOS = ['gaby', 'jair'];
+    public const USUARIOS = ['gaby', 'jair', 'jairaib'];
 
     public const MODULOS = ['diagnostico', 'guia1', 'guia2', 'practica', 'simulacro1', 'simulacro2', 'practica2', 'simulacro3', 'practica3', 'practica4', 'simulacro4', 'practica5', 'simulacro5', 'practica6', 'simulacro6', 'snapshot'];
 
